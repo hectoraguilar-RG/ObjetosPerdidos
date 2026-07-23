@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAP Secundaria - Objetos Olvidados</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased pb-12">
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="bg-blue-800 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col lg:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-start">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/20 p-2 rounded-lg">
+                        <i data-lucide="archive" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight">CAP Secundaria</h1>
+                        <p class="text-xs text-blue-200">Control de Objetos Olvidados</p>
+                    </div>
+                </div>
+                
+                <!-- Sistema de Acceso Discreto por PIN -->
+                <div class="flex items-center gap-2">
+                    <span id="badge-rol" class="text-[10px] uppercase font-bold px-2 py-1 bg-blue-900 text-blue-200 rounded-lg border border-blue-700">Modo Consulta</span>
+                    <button onclick="toggleAdminAccess()" id="btn-acceso" class="text-xs font-semibold bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1">
+                        <i data-lucide="lock" class="w-3.5 h-3.5" id="icono-lock"></i> <span id="texto-lock">Ingresar PIN</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Tabs de Navegación -->
+            <nav class="flex bg-blue-900/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto" id="main-nav">
+                <button onclick="switchTab('inventario')" id="tab-inventario" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white text-blue-800 shadow-sm whitespace-nowrap">
+                    <i data-lucide="search" class="w-4 h-4"></i> Buscar Inventario
+                </button>
+                <button onclick="switchTab('registro')" id="tab-registro" class="hidden items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-white hover:bg-white/10 whitespace-nowrap">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Registrar Objeto
+                </button>
+                <button onclick="switchTab('reportes')" id="tab-reportes" class="hidden items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-white hover:bg-white/10 whitespace-nowrap">
+                    <i data-lucide="clipboard-list" class="w-4 h-4"></i> Donaciones (Fin de Ciclo)
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 mt-6">
+        
+        <!-- PANTALLA 1: INVENTARIO Y BÚSQUEDA -->
+        <section id="view-inventario" class="space-y-6">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="relative w-full md:w-1/2">
+                    <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                    <input type="text" id="search-input" oninput="filterItems()" placeholder="Buscar por código (ej: ROP-001), color, marca, descripción..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm">
+                </div>
+                
+                <div class="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+                    <select id="filter-category" onchange="filterItems()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Todos">Todas las Categorías</option>
+                        <option value="Ropa">Ropa</option>
+                        <option value="Botellas">Botellas</option>
+                        <option value="Tupper">Tupper</option>
+                        <option value="Calzado">Calzado</option>
+                        <option value="Loncheras">Loncheras</option>
+                        <option value="Mochilas">Mochilas</option>
+                        <option value="Bolsas">Bolsas</option>
+                        <option value="General">General</option>
+                    </select>
+
+                    <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200" id="status-filter-container">
+                        <button onclick="setStatusFilter('Todos')" id="filter-status-todos" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-800 shadow-sm transition-all">Todos</button>
+                        <button onclick="setStatusFilter('En Bodega')" id="filter-status-bodega" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">En Bodega</button>
+                        <button onclick="setStatusFilter('Entregado')" id="filter-status-entregado" class="hidden px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">Entregados</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="objects-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Dinámico -->
+            </div>
+        </section>
+
+        <!-- PANTALLA 2: FORMULARIO DE REGISTRO (SOLO ADMIN) -->
+        <section id="view-registro" class="hidden max-w-2xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="bg-blue-50 px-6 py-4 border-b border-blue-100 flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="text-blue-600 w-5 h-5"></i>
+                    <h2 class="font-semibold text-blue-900">Ingreso de Nuevo Objeto</h2>
+                </div>
+                
+                <form id="form-registro" onsubmit="saveNewItem(event)" class="p-6 space-y-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Categoría *</label>
+                            <select id="reg-category" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <option value="" disabled selected>Selecciona categoría</option>
+                                <option value="Ropa">Ropa</option>
+                                <option value="Botellas">Botellas</option>
+                                <option value="Tupper">Tupper</option>
+                                <option value="Calzado">Calzado</option>
+                                <option value="Loncheras">Loncheras</option>
+                                <option value="Mochilas">Mochilas</option>
+                                <option value="Bolsas">Bolsas</option>
+                                <option value="General">General</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Fecha de Hallazgo *</label>
+                            <input type="date" id="reg-date" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Color Principal *</label>
+                            <input type="text" id="reg-color" required placeholder="Ej: Azul marino, Rosa" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Marca / Logotipo</label>
+                            <input type="text" id="reg-brand" placeholder="Ej: Nike, Tupperware, Sin marca" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Descripción Específica / Detalles distintivos *</label>
+                        <textarea id="reg-description" rows="2" required placeholder="Ej: Raspado de la base, tiene grabado el nombre de un niño borroso." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Fotografía del Objeto *</label>
+                        <div class="flex items-center justify-center w-full">
+                            <label class="flex flex-col items-center justify-center w-full h-36 border-2 border-slate-200 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all relative overflow-hidden group">
+                                <div id="photo-placeholder" class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                                    <i data-lucide="camera" class="w-7 h-7 text-slate-400 mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <p class="text-xs font-medium text-slate-600">Tomar foto o subir archivo</p>
+                                </div>
+                                <img id="photo-preview" class="absolute inset-0 w-full h-full object-cover hidden">
+                                <input type="file" id="reg-photo" accept="image/*" required onchange="previewImage(event)" class="hidden" />
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" onclick="switchTab('inventario')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancelar</button>
+                        <button type="submit" class="px-5 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-sm transition-all flex items-center gap-2">
+                            <i data-lucide="check" class="w-4 h-4"></i> Guardar Registro
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- PANTALLA 3: DONACIONES (SOLO ADMIN) -->
+        <section id="view-reportes" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">Listado para Donación</h2>
+                    <p class="text-xs text-slate-500">Objetos almacenados en bodega que no fueron reclamados durante el ciclo escolar.</p>
+                </div>
+                <button onclick="exportToExcelSim()" class="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2 w-full sm:w-auto justify-center">
+                    <i data-lucide="download" class="w-4 h-4"></i> Exportar Lista (.CSV)
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                                <th class="py-3 px-4">Código Bodega</th>
+                                <th class="py-3 px-4">Categoría</th>
+                                <th class="py-3 px-4">Características (Color / Marca)</th>
+                                <th class="py-3 px-4">Detalles</th>
+                                <th class="py-3 px-4">Fecha Hallazgo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="donation-table-body" class="text-sm divide-y divide-slate-100 text-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL DE ENTREGA -->
+    <div id="modal-entrega" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md overflow-hidden transform scale-95 opacity-0 transition-all duration-200" id="modal-content">
+            <div class="bg-amber-50 px-6 py-4 border-b border-amber-100 flex justify-between items-center">
+                <div class="flex items-center gap-2 text-amber-800 font-semibold"><i data-lucide="log-out" class="w-5 h-5"></i><h3>Registrar Salida</h3></div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form onsubmit="confirmDelivery(event)" class="p-6 space-y-4">
+                <input type="hidden" id="delivery-item-id">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex gap-3 items-center">
+                    <img id="delivery-item-img" src="" class="w-12 h-12 rounded-lg object-cover">
+                    <div>
+                        <p class="text-xs font-bold text-blue-700" id="delivery-item-code"></p>
+                        <p class="text-xs text-slate-600 font-medium" id="delivery-item-features"></p>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Nombre de quien Recibe *</label>
+                    <input type="text" id="student-name" required placeholder="Ej: Papá de Carlos Rios / Alumno Juan Pérez" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Grado <span class="text-slate-400">(Opcional)</span></label>
+                        <select id="student-grade" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="">-- No aplica / Padre --</option>
+                            <option value="Primaria / Externo">Primaria / Externo</option>
+                            <option value="1°">1° Año</option><option value="2°">2° Año</option><option value="3°">3° Año</option>
+                            <option value="4°">4° Año</option><option value="5°">5° Año</option><option value="6°">6° Año</option>
+                            <option value="7°">7° Año</option><option value="8°">8° Año</option><option value="9°">9° Año</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Grupo <span class="text-slate-400">(Opcional)</span></label>
+                        <select id="student-group" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="">-- Sin Grupo --</option>
+                            <option value="A">Grupo A</option><option value="B">Grupo B</option><option value="C">Grupo C</option><option value="D">Grupo D</option><option value="E">Grupo E</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 rounded-xl shadow-sm flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> Guardar Entrega</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONEXIÓN KERNEL FIREBASE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+        // Configuración oficial enlazada a tu cuenta del colegio
+        const firebaseConfig = {
+            apiKey: "AIzaSyALujqBj5cBkmCn6U3xNO7EnQEpllQ7leY",
+            authDomain: "cap-secundaria-objetos.firebaseapp.com",
+            projectId: "cap-secundaria-objetos",
+            storageBucket: "cap-secundaria-objetos.firebasestorage.app",
+            messagingSenderId: "315921384381",
+            appId: "1:315921384381:web:2db81db6fd8e863a8f48d4"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        const categoryPrefixes = { Ropa: "ROP", Botellas: "BOT", Tupper: "TUP", Calzado: "CAL", Loncheras: "LON", Mochilas: "MOC", Bolsas: "BOL", General: "GEN" };
+        const PIN_CORRECTO = "P0803";
+        
+        window.currentRole = 'consulta';
+        window.currentStatusFilter = 'Todos';
+        window.itemsGlobal = [];
+        let selectedFileBlob = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('reg-date').value = new Date().toISOString().split('T')[0];
+            initRealtimeSync();
+        });
+
+        // ESCUCHA EN TIEMPO REAL NATIVA
+        function initRealtimeSync() {
+            const q = query(collection(db, "objetos"), orderBy("date", "desc"));
+            onSnapshot(q, (snapshot) => {
+                window.itemsGlobal = [];
+                snapshot.forEach((doc) => {
+                    window.itemsGlobal.push({ id: doc.id, ...doc.data() });
+                });
+                window.filterItems();
+            }, (error) => {
+                console.error("Error en sincronización: ", error);
+            });
+        }
+
+        // SEGURIDAD POR PIN INTELIGENTE
+        window.toggleAdminAccess = function() {
+            if (window.currentRole === 'admin') {
+                window.currentRole = 'consulta';
+                alert("Has cerrado sesión de administrador.");
+                applyRoleUI();
+            } else {
+                const pinInput = prompt("Introduce el PIN secreto de administración:");
+                if (pinInput === PIN_CORRECTO) {
+                    window.currentRole = 'admin';
+                    alert("¡Acceso autorizado! Modo administrador activo.");
+                    applyRoleUI();
+                } else if(pinInput !== null) {
+                    alert("PIN incorrecto. Acceso denegado.");
+                }
+            }
+        }
+
+        function applyRoleUI() {
+            const isAdmin = window.currentRole === 'admin';
+            document.getElementById('badge-rol').innerText = isAdmin ? "Modo Administrador" : "Modo Consulta";
+            document.getElementById('badge-rol').className = isAdmin ? "text-[10px] uppercase font-bold px-2 py-1 bg-amber-900 text-amber-200 rounded-lg border border-amber-700" : "text-[10px] uppercase font-bold px-2 py-1 bg-blue-900 text-blue-200 rounded-lg border border-blue-700";
+            document.getElementById('texto-lock').innerText = isAdmin ? "Salir de Admin" : "Ingresar PIN";
+            document.getElementById('icono-lock').setAttribute('data-lucide', isAdmin ? 'unlock' : 'lock');
+            
+            document.getElementById('tab-registro').style.display = isAdmin ? 'flex' : 'none';
+            document.getElementById('tab-reportes').style.display = isAdmin ? 'flex' : 'none';
+            document.getElementById('filter-status-entregado').style.display = isAdmin ? 'inline-block' : 'none';
+            
+            if (!isAdmin) {
+                window.switchTab('inventario');
+                if(window.currentStatusFilter === 'Entregado') window.setStatusFilter('Todos');
+            } else {
+                window.filterItems();
+            }
+            lucide.createIcons();
+        }
+
+        window.switchTab = function(tabName) {
+            ['inventario', 'registro', 'reportes'].forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+                if(document.getElementById(`tab-${v}`)) document.getElementById(`tab-${v}`).className = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-white hover:bg-white/10 whitespace-nowrap";
+            });
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).className = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white text-blue-800 shadow-sm whitespace-nowrap";
+            if(tabName === 'reportes') renderDonationTable();
+        }
+
+        window.setStatusFilter = function(status) {
+            window.currentStatusFilter = status;
+            ['todos', 'bodega', 'entregado'].forEach(s => {
+                if(document.getElementById(`filter-status-${s}`)) document.getElementById(`filter-status-${s}`).className = "px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all";
+            });
+            const activeSub = status === 'Todos' ? 'todos' : status === 'En Bodega' ? 'bodega' : 'entregado';
+            document.getElementById(`filter-status-${activeSub}`).className = "px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-800 shadow-sm transition-all";
+            window.filterItems();
+        }
+
+        window.filterItems = function() {
+            const searchText = document.getElementById('search-input').value.toLowerCase();
+            const categoryText = document.getElementById('filter-category').value;
+
+            const filtered = window.itemsGlobal.filter(item => {
+                const matchesSearch = (item.code || '').toLowerCase().includes(searchText) || 
+                                      (item.color || '').toLowerCase().includes(searchText) || 
+                                      (item.brand || '').toLowerCase().includes(searchText) || 
+                                      (item.description || '').toLowerCase().includes(searchText) ||
+                                      (item.student && item.student.toLowerCase().includes(searchText));
+                const matchesCategory = categoryText === 'Todos' || item.category === categoryText;
+                const matchesStatus = window.currentStatusFilter === 'Todos' || item.status === window.currentStatusFilter;
+                return matchesSearch && matchesCategory && matchesStatus;
+            });
+            renderGrid(filtered);
+        }
+
+        function renderGrid(dataToRender) {
+            const grid = document.getElementById('objects-grid');
+            grid.innerHTML = '';
+            const isAdmin = window.currentRole === 'admin';
+
+            if (dataToRender.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed"><p class="text-sm">Sin coincidencias encontradas.</p></div>`;
+                return;
+            }
+
+            dataToRender.forEach(item => {
+                const isBodega = item.status === 'En Bodega';
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl shadow-xs border border-slate-100 overflow-hidden hover:shadow-md transition-all flex flex-col";
+                card.innerHTML = `
+                    <div class="relative h-44 bg-slate-100"><img src="${item.photo}" class="w-full h-full object-cover"></div>
+                    <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+                        <div>
+                            <div class="flex items-center justify-between"><span class="text-[11px] font-bold text-blue-700">${item.category}</span><span class="text-xs font-mono font-bold bg-slate-100 px-2 rounded">${item.code}</span></div>
+                            <div class="space-y-0.5 my-1 text-xs">
+                                <div><span class="text-slate-400">Color:</span> <span class="font-semibold text-slate-700">${item.color}</span></div>
+                                <div><span class="text-slate-400">Marca:</span> <span class="font-semibold text-slate-700">${item.brand}</span></div>
+                            </div>
+                            <p class="text-xs text-slate-500 italic pl-1 border-l">"${item.description}"</p>
+                        </div>
+                        <div class="pt-1">
+                            ${isBodega ? (isAdmin ? `<button onclick="openDeliveryModal('${item.id}')" class="w-full bg-blue-50 hover:bg-amber-500 hover:text-white text-blue-700 py-2 rounded-xl text-xs font-semibold">Registrar Entrega</button>` : `<div class="text-center py-1.5 bg-slate-50 text-slate-400 rounded-xl text-xs">En Bodega</div>`) : `<div class="bg-emerald-50 p-2 rounded-xl text-[11px]"><span class="font-bold text-emerald-800 block">Entregado a:</span>${item.student} ${item.grade ? `(${item.grade} ${item.group || ''})` : ''}</div>`}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        window.previewImage = function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFileBlob = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('photo-preview').src = e.target.result;
+                    document.getElementById('photo-preview').classList.remove('hidden');
+                    document.getElementById('photo-placeholder').classList.add('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // GUARDADO REAL EN LA NUBE
+        window.saveNewItem = async function(e) {
+            e.preventDefault();
+            const category = document.getElementById('reg-category').value;
+            const date = document.getElementById('reg-date').value;
+            const color = document.getElementById('reg-color').value;
+            const brand = document.getElementById('reg-brand').value || 'Sin marca';
+            const description = document.getElementById('reg-description').value;
+
+            const prefix = categoryPrefixes[category] || "GEN";
+            const categoryItems = window.itemsGlobal.filter(i => (i.code || '').startsWith(prefix));
+            let nextNum = 1;
+            if (categoryItems.length > 0) {
+                const numbers = categoryItems.map(i => parseInt(i.code.split('-')[1]) || 0);
+                nextNum = Math.max(...numbers) + 1;
+            }
+            const formattedCode = `${prefix}-${String(nextNum).padStart(3, '0')}`;
+
+            try {
+                let photoUrl = "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=200";
+                if (selectedFileBlob) {
+                    const storageRef = ref(storage, `fotos/${Date.now()}_${selectedFileBlob.name}`);
+                    const uploadResult = await uploadBytes(storageRef, selectedFileBlob);
+                    photoUrl = await getDownloadURL(uploadResult.ref);
+                }
+
+                await addDoc(collection(db, "objetos"), {
+                    code: formattedCode, category, date, color, brand, description, status: "En Bodega", photo: photoUrl
+                });
+
+                document.getElementById('form-registro').reset();
+                document.getElementById('photo-preview').classList.add('hidden');
+                document.getElementById('photo-placeholder').classList.remove('hidden');
+                selectedFileBlob = null;
+                window.switchTab('inventario');
+                alert(`¡Guardado en la Nube con éxito!\nCódigo asignado: ${formattedCode}`);
+            } catch (err) {
+                console.error(err);
+                alert("Hubo un percance al subir a la nube. Verifica que las reglas de Firestore y Storage estén en Modo de Prueba.");
+            }
+        }
+
+        window.openDeliveryModal = function(id) {
+            const item = window.itemsGlobal.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('delivery-item-id').value = id;
+            document.getElementById('delivery-item-code').innerText = item.code;
+            document.getElementById('delivery-item-features').innerText = `${item.category} • ${item.color}`;
+            document.getElementById('delivery-item-img').src = item.photo;
+
+            document.getElementById('modal-entrega').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('modal-content').classList.remove('scale-95', 'opacity-0');
+                document.getElementById('modal-content').classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        window.closeModal = function() {
+            document.getElementById('modal-content').classList.remove('scale-100', 'opacity-100');
+            document.getElementById('modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => { document.getElementById('modal-entrega').classList.add('hidden'); }, 200);
+        }
+
+        window.confirmDelivery = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('delivery-item-id').value;
+            const student = document.getElementById('student-name').value;
+            const grade = document.getElementById('student-grade').value;
+            const group = document.getElementById('student-group').value;
+
+            try {
+                const docRef = doc(db, "objetos", id);
+                await updateDoc(docRef, {
+                    status: "Entregado", student, grade: grade || null, group: group || null
+                });
+                window.closeModal();
+            } catch (err) {
+                console.error(err);
+                alert("Error al guardar entrega en la nube.");
+            }
+        }
+
+        function renderDonationTable() {
+            const tbody = document.getElementById('donation-table-body');
+            tbody.innerHTML = '';
+            const bodegaItems = window.itemsGlobal.filter(item => item.status === 'En Bodega');
+            if(bodegaItems.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">Sin pendientes.</td></tr>`; return; }
+            bodegaItems.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="py-2 px-4 font-bold text-blue-700">${item.code}</td><td class="py-2 px-4">${item.category}</td><td class="py-2 px-4 text-xs">Color: ${item.color} | Marca: ${item.brand}</td><td class="py-2 px-4 italic text-xs">"${item.description}"</td><td class="py-2 px-4 text-xs">${item.date}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.exportToExcelSim = function() {
+            const bodegaItems = window.itemsGlobal.filter(item => item.status === 'En Bodega');
+            if(bodegaItems.length === 0) return alert("Sin datos.");
+            let csvContent = "data:text/csv;charset=utf-8,Codigo Bodega,Categoria,Color,Marca,Detalles,Fecha\n";
+            bodegaItems.forEach(item => { csvContent += `...`; }); // Estructura simplificada
+            const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", "CAP_Reporte_Donacion.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
