@@ -34,7 +34,7 @@
                 </div>
             </div>
             
-            <!-- Tabs de Navegación -->
+            <!-- Tabs de Navegación (inician ocultos por clase "hidden" para evitar parpadeos en iPad) -->
             <nav class="flex bg-blue-900/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto" id="main-nav">
                 <button onclick="switchTab('inventario')" id="tab-inventario" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white text-blue-800 shadow-sm whitespace-nowrap">
                     <i data-lucide="search" class="w-4 h-4"></i> Buscar Inventario
@@ -240,7 +240,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
-        // Configuración oficial enlazada a tu cuenta del colegio
+        // Configuración oficial
         const firebaseConfig = {
             apiKey: "AIzaSyALujqBj5cBkmCn6U3xNO7EnQEpllQ7leY",
             authDomain: "cap-secundaria-objetos.firebaseapp.com",
@@ -263,6 +263,8 @@
         let selectedFileBlob = null;
 
         window.addEventListener('DOMContentLoaded', () => {
+            // Fuerza la vista de modo consulta antes de cargar los datos
+            applyRoleUI(); 
             document.getElementById('reg-date').value = new Date().toISOString().split('T')[0];
             initRealtimeSync();
         });
@@ -275,10 +277,25 @@
                 snapshot.forEach((doc) => {
                     window.itemsGlobal.push({ id: doc.id, ...doc.data() });
                 });
+                
+                // Lee si hay algún código en la URL (ej: ?buscar=ROP-001)
+                handleDirectLink();
                 window.filterItems();
             }, (error) => {
                 console.error("Error en sincronización: ", error);
             });
+        }
+
+        // FUNCIÓN PARA BUSCAR DESDE ENLACE DE WHATSAPP / LINK DIRECTO (?buscar=...)
+        function handleDirectLink() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const busquedaRapida = urlParams.get('buscar');
+            if (busquedaRapida) {
+                const input = document.getElementById('search-input');
+                if (input && input.value !== busquedaRapida) {
+                    input.value = busquedaRapida;
+                }
+            }
         }
 
         // SEGURIDAD POR PIN INTELIGENTE
@@ -306,9 +323,14 @@
             document.getElementById('texto-lock').innerText = isAdmin ? "Salir de Admin" : "Ingresar PIN";
             document.getElementById('icono-lock').setAttribute('data-lucide', isAdmin ? 'unlock' : 'lock');
             
-            document.getElementById('tab-registro').style.display = isAdmin ? 'flex' : 'none';
-            document.getElementById('tab-reportes').style.display = isAdmin ? 'flex' : 'none';
-            document.getElementById('filter-status-entregado').style.display = isAdmin ? 'inline-block' : 'none';
+            // Oculta/Muestra opciones de admin
+            const tabReg = document.getElementById('tab-registro');
+            const tabRep = document.getElementById('tab-reportes');
+            const filterEntregado = document.getElementById('filter-status-entregado');
+
+            if (tabReg) tabReg.style.display = isAdmin ? 'flex' : 'none';
+            if (tabRep) tabRep.style.display = isAdmin ? 'flex' : 'none';
+            if (filterEntregado) filterEntregado.style.display = isAdmin ? 'inline-block' : 'none';
             
             if (!isAdmin) {
                 window.switchTab('inventario');
@@ -316,32 +338,43 @@
             } else {
                 window.filterItems();
             }
-            lucide.createIcons();
+            if (window.lucide) lucide.createIcons();
         }
 
         window.switchTab = function(tabName) {
             ['inventario', 'registro', 'reportes'].forEach(v => {
-                document.getElementById(`view-${v}`).classList.add('hidden');
-                if(document.getElementById(`tab-${v}`)) document.getElementById(`tab-${v}`).className = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-white hover:bg-white/10 whitespace-nowrap";
+                const view = document.getElementById(`view-${v}`);
+                const tab = document.getElementById(`tab-${v}`);
+                if (view) view.classList.add('hidden');
+                if (tab) tab.className = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-white hover:bg-white/10 whitespace-nowrap";
             });
-            document.getElementById(`view-${tabName}`).classList.remove('hidden');
-            document.getElementById(`tab-${tabName}`).className = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white text-blue-800 shadow-sm whitespace-nowrap";
-            if(tabName === 'reportes') renderDonationTable();
+            
+            const activeView = document.getElementById(`view-${tabName}`);
+            const activeTab = document.getElementById(`tab-${tabName}`);
+            if (activeView) activeView.classList.remove('hidden');
+            if (activeTab) activeTab.className = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white text-blue-800 shadow-sm whitespace-nowrap";
+            
+            if (tabName === 'reportes') renderDonationTable();
         }
 
         window.setStatusFilter = function(status) {
             window.currentStatusFilter = status;
             ['todos', 'bodega', 'entregado'].forEach(s => {
-                if(document.getElementById(`filter-status-${s}`)) document.getElementById(`filter-status-${s}`).className = "px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all";
+                const btn = document.getElementById(`filter-status-${s}`);
+                if(btn) btn.className = "px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all";
             });
             const activeSub = status === 'Todos' ? 'todos' : status === 'En Bodega' ? 'bodega' : 'entregado';
-            document.getElementById(`filter-status-${activeSub}`).className = "px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-800 shadow-sm transition-all";
+            const activeBtn = document.getElementById(`filter-status-${activeSub}`);
+            if(activeBtn) activeBtn.className = "px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-800 shadow-sm transition-all";
             window.filterItems();
         }
 
         window.filterItems = function() {
-            const searchText = document.getElementById('search-input').value.toLowerCase();
-            const categoryText = document.getElementById('filter-category').value;
+            const searchInput = document.getElementById('search-input');
+            const categoryInput = document.getElementById('filter-category');
+            
+            const searchText = searchInput ? searchInput.value.toLowerCase() : '';
+            const categoryText = categoryInput ? categoryInput.value : 'Todos';
 
             const filtered = window.itemsGlobal.filter(item => {
                 const matchesSearch = (item.code || '').toLowerCase().includes(searchText) || 
@@ -358,6 +391,7 @@
 
         function renderGrid(dataToRender) {
             const grid = document.getElementById('objects-grid');
+            if (!grid) return;
             grid.innerHTML = '';
             const isAdmin = window.currentRole === 'admin';
 
@@ -382,13 +416,13 @@
                             <p class="text-xs text-slate-500 italic pl-1 border-l">"${item.description}"</p>
                         </div>
                         <div class="pt-1">
-                            ${isBodega ? (isAdmin ? `<button onclick="openDeliveryModal('${item.id}')" class="w-full bg-blue-50 hover:bg-amber-500 hover:text-white text-blue-700 py-2 rounded-xl text-xs font-semibold">Registrar Entrega</button>` : `<div class="text-center py-1.5 bg-slate-50 text-slate-400 rounded-xl text-xs">En Bodega</div>`) : `<div class="bg-emerald-50 p-2 rounded-xl text-[11px]"><span class="font-bold text-emerald-800 block">Entregado a:</span>${item.student} ${item.grade ? `(${item.grade} ${item.group || ''})` : ''}</div>`}
+                            ${isBodega ? (isAdmin ? `<button onclick="openDeliveryModal('${item.id}')" class="w-full bg-blue-50 hover:bg-amber-500 hover:text-white text-blue-700 py-2 rounded-xl text-xs font-semibold">Registrar Entrega</button>` : `<div class="text-center py-1.5 bg-slate-50 text-slate-400 rounded-xl text-xs font-medium">En Bodega</div>`) : `<div class="bg-emerald-50 p-2 rounded-xl text-[11px]"><span class="font-bold text-emerald-800 block">Entregado a:</span>${item.student} ${item.grade ? `(${item.grade} ${item.group || ''})` : ''}</div>`}
                         </div>
                     </div>
                 `;
                 grid.appendChild(card);
             });
-            lucide.createIcons();
+            if (window.lucide) lucide.createIcons();
         }
 
         window.previewImage = function(event) {
@@ -443,7 +477,7 @@
                 alert(`¡Guardado en la Nube con éxito!\nCódigo asignado: ${formattedCode}`);
             } catch (err) {
                 console.error(err);
-                alert("Hubo un percance al subir a la nube. Verifica que las reglas de Firestore y Storage estén en Modo de Prueba.");
+                alert("Hubo un percance al subir a la nube. Verifica las reglas de Firestore y Storage.");
             }
         }
 
@@ -483,28 +517,59 @@
                 window.closeModal();
             } catch (err) {
                 console.error(err);
-                alert("Error al guardar entrega en la nube.");
+                alert("Error al guardar la entrega en la nube.");
             }
         }
 
         function renderDonationTable() {
             const tbody = document.getElementById('donation-table-body');
+            if (!tbody) return;
             tbody.innerHTML = '';
-            const bodegaItems = window.itemsGlobal.filter(item => item.status === 'En Bodega');
-            if(bodegaItems.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">Sin pendientes.</td></tr>`; return; }
-            bodegaItems.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td class="py-2 px-4 font-bold text-blue-700">${item.code}</td><td class="py-2 px-4">${item.category}</td><td class="py-2 px-4 text-xs">Color: ${item.color} | Marca: ${item.brand}</td><td class="py-2 px-4 italic text-xs">"${item.description}"</td><td class="py-2 px-4 text-xs">${item.date}</td>`;
-                tbody.appendChild(tr);
+            
+            const itemsBodega = window.itemsGlobal.filter(i => i.status === 'En Bodega');
+            
+            if (itemsBodega.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">No hay objetos pendientes para donación en bodega.</td></tr>`;
+                return;
+            }
+            
+            itemsBodega.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-50 transition-colors border-b border-slate-100";
+                row.innerHTML = `
+                    <td class="py-3 px-4 font-mono font-bold text-blue-700">${item.code || '-'}</td>
+                    <td class="py-3 px-4 font-medium text-slate-800">${item.category || '-'}</td>
+                    <td class="py-3 px-4 text-slate-600">${item.color || ''} ${item.brand ? '/ ' + item.brand : ''}</td>
+                    <td class="py-3 px-4 text-slate-500 italic text-xs max-w-xs truncate">${item.description || '-'}</td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${item.date || '-'}</td>
+                `;
+                tbody.appendChild(row);
             });
         }
 
         window.exportToExcelSim = function() {
-            const bodegaItems = window.itemsGlobal.filter(item => item.status === 'En Bodega');
-            if(bodegaItems.length === 0) return alert("Sin datos.");
-            let csvContent = "data:text/csv;charset=utf-8,Codigo Bodega,Categoria,Color,Marca,Detalles,Fecha\n";
-            bodegaItems.forEach(item => { csvContent += `...`; }); // Estructura simplificada
-            const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", "CAP_Reporte_Donacion.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            const itemsBodega = window.itemsGlobal.filter(i => i.status === 'En Bodega');
+            if (itemsBodega.length === 0) {
+                alert("No hay elementos 'En Bodega' para exportar.");
+                return;
+            }
+
+            // UTF-8 BOM para soporte correcto de tildes en Excel
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+            csvContent += "Codigo,Categoria,Color,Marca,Descripcion,Fecha Hallazgo\n";
+
+            itemsBodega.forEach(i => {
+                const cleanDesc = (i.description || '').replace(/"/g, '""');
+                csvContent += `"${i.code}","${i.category}","${i.color}","${i.brand}","${cleanDesc}","${i.date}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Donaciones_CAP_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     </script>
 </body>
