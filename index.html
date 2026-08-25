@@ -41,7 +41,7 @@
                 </div>
             </div>
             
-            <!-- Tabs de Navegación (inician ocultos por clase "hidden" para evitar parpadeos en iPad) -->
+            <!-- Tabs de Navegación -->
             <nav class="flex bg-blue-900/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto" id="main-nav">
                 <button onclick="switchTab('inventario')" id="tab-inventario" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white text-blue-800 shadow-sm whitespace-nowrap">
                     <i data-lucide="search" class="w-4 h-4"></i> Buscar Inventario
@@ -92,7 +92,7 @@
             </div>
         </section>
 
-        <!-- PANTALLA 2: FORMULARIO DE REGISTRO (SOLO ADMIN) -->
+        <!-- PANTALLA 2: FORMULARIO DE REGISTRO -->
         <section id="view-registro" class="hidden max-w-2xl mx-auto">
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div class="bg-blue-50 px-6 py-4 border-b border-blue-100 flex items-center gap-2">
@@ -162,7 +162,7 @@
             </div>
         </section>
 
-        <!-- PANTALLA 3: DONACIONES (SOLO ADMIN) -->
+        <!-- PANTALLA 3: DONACIONES -->
         <section id="view-reportes" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -218,18 +218,15 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Grado <span class="text-slate-400">(Opcional)</span></label>
                         <select id="student-grade" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="">-- No aplica / Padre --</option>
-                            <option value="Primaria / Externo">Primaria / Externo</option>
+                            <option value="">-- No aplica --</option>
                             <option value="1°">1° Año</option><option value="2°">2° Año</option><option value="3°">3° Año</option>
-                            <option value="4°">4° Año</option><option value="5°">5° Año</option><option value="6°">6° Año</option>
-                            <option value="7°">7° Año</option><option value="8°">8° Año</option><option value="9°">9° Año</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Grupo <span class="text-slate-400">(Opcional)</span></label>
                         <select id="student-group" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             <option value="">-- Sin Grupo --</option>
-                            <option value="A">Grupo A</option><option value="B">Grupo B</option><option value="C">Grupo C</option><option value="D">Grupo D</option><option value="E">Grupo E</option>
+                            <option value="A">Grupo A</option><option value="B">Grupo B</option><option value="C">Grupo C</option>
                         </select>
                     </div>
                 </div>
@@ -241,13 +238,11 @@
         </div>
     </div>
 
-    <!-- CONEXIÓN KERNEL FIREBASE -->
+    <!-- CONEXIÓN FIREBASE FIRESTORE (SIN STORAGE) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
-        // Configuración oficial
         const firebaseConfig = {
             apiKey: "AIzaSyALujqBj5cBkmCn6U3xNO7EnQEpllQ7leY",
             authDomain: "cap-secundaria-objetos.firebaseapp.com",
@@ -259,7 +254,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const storage = getStorage(app);
 
         const categoryPrefixes = { Ropa: "ROP", Botellas: "BOT", Tupper: "TUP", Calzado: "CAL", Loncheras: "LON", Mochilas: "MOC", Bolsas: "BOL", General: "GEN" };
         const PIN_CORRECTO = "P0803";
@@ -270,22 +264,18 @@
         let selectedFileBlob = null;
 
         window.addEventListener('DOMContentLoaded', () => {
-            // Fuerza la vista de modo consulta antes de cargar los datos
             applyRoleUI(); 
             document.getElementById('reg-date').value = new Date().toISOString().split('T')[0];
             initRealtimeSync();
         });
 
-        // ESCUCHA EN TIEMPO REAL NATIVA
         function initRealtimeSync() {
             const q = query(collection(db, "objetos"), orderBy("date", "desc"));
             onSnapshot(q, (snapshot) => {
                 window.itemsGlobal = [];
-                snapshot.forEach((doc) => {
-                    window.itemsGlobal.push({ id: doc.id, ...doc.data() });
+                snapshot.forEach((d) => {
+                    window.itemsGlobal.push({ id: d.id, ...d.data() });
                 });
-                
-                // Lee si hay algún código en la URL (ej: ?buscar=ROP-001)
                 handleDirectLink();
                 window.filterItems();
             }, (error) => {
@@ -293,7 +283,6 @@
             });
         }
 
-        // FUNCIÓN PARA BUSCAR DESDE ENLACE DE WHATSAPP / LINK DIRECTO (?buscar=...)
         function handleDirectLink() {
             const urlParams = new URLSearchParams(window.location.search);
             const busquedaRapida = urlParams.get('buscar');
@@ -305,7 +294,6 @@
             }
         }
 
-        // SEGURIDAD POR PIN INTELIGENTE
         window.toggleAdminAccess = function() {
             if (window.currentRole === 'admin') {
                 window.currentRole = 'consulta';
@@ -330,7 +318,6 @@
             document.getElementById('texto-lock').innerText = isAdmin ? "Salir de Admin" : "Ingresar PIN";
             document.getElementById('icono-lock').setAttribute('data-lucide', isAdmin ? 'unlock' : 'lock');
             
-            // Oculta/Muestra opciones de admin
             const tabReg = document.getElementById('tab-registro');
             const tabRep = document.getElementById('tab-reportes');
             const filterEntregado = document.getElementById('filter-status-entregado');
@@ -385,10 +372,10 @@
 
             const filtered = window.itemsGlobal.filter(item => {
                 const matchesSearch = (item.code || '').toLowerCase().includes(searchText) || 
-                                      (item.color || '').toLowerCase().includes(searchText) || 
-                                      (item.brand || '').toLowerCase().includes(searchText) || 
-                                      (item.description || '').toLowerCase().includes(searchText) ||
-                                      (item.student && item.student.toLowerCase().includes(searchText));
+                                    (item.color || '').toLowerCase().includes(searchText) || 
+                                    (item.brand || '').toLowerCase().includes(searchText) || 
+                                    (item.description || '').toLowerCase().includes(searchText) ||
+                                    (item.student && item.student.toLowerCase().includes(searchText));
                 const matchesCategory = categoryText === 'Todos' || item.category === categoryText;
                 const matchesStatus = window.currentStatusFilter === 'Todos' || item.status === window.currentStatusFilter;
                 return matchesSearch && matchesCategory && matchesStatus;
@@ -446,7 +433,7 @@
             }
         }
 
- // GUARDADO DIRECTO EN FIRESTORE (SIN USAR STORAGE / 100% GRATIS)
+        // GUARDADO DIRECTO EN FIRESTORE (SIN STORAGE)
         window.saveNewItem = async function(e) {
             e.preventDefault();
             const category = document.getElementById('reg-category').value;
@@ -467,7 +454,6 @@
             try {
                 let photoUrl = "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=200";
 
-                // Convierte la imagen a texto comprimido directamente
                 if (selectedFileBlob) {
                     photoUrl = await compressAndConvertToBase64(selectedFileBlob);
                 }
@@ -488,7 +474,6 @@
             }
         }
 
-        // Función auxiliar para optimizar y reducir el tamaño de la foto gratis
         function compressAndConvertToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -498,14 +483,14 @@
                     img.src = event.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const maxWidth = 600; // Redimensiona para no saturar memoria
+                        const maxWidth = 600; 
                         const scaleSize = maxWidth / img.width;
                         canvas.width = maxWidth;
                         canvas.height = img.height * scaleSize;
 
-                        const ctx = canvas.getContext('2d'); // <-- CORREGIDO AQUÍ ('2d')
+                        const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compresión al 70%
+                        resolve(canvas.toDataURL('image/jpeg', 0.7));
                     };
                     img.onerror = (error) => reject(error);
                 };
@@ -562,22 +547,52 @@
             link.click();
             document.body.removeChild(link);
         }
-            // UTF-8 BOM para soporte correcto de tildes en Excel
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-            csvContent += "Codigo,Categoria,Color,Marca,Descripcion,Fecha Hallazgo\n";
 
-            itemsBodega.forEach(i => {
-                const cleanDesc = (i.description || '').replace(/"/g, '""');
-                csvContent += `"${i.code}","${i.category}","${i.color}","${i.brand}","${cleanDesc}","${i.date}"\n`;
-            });
+        window.openDeliveryModal = function(id) {
+            const item = window.itemsGlobal.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('delivery-item-id').value = item.id;
+            document.getElementById('delivery-item-img').src = item.photo;
+            document.getElementById('delivery-item-code').innerText = item.code;
+            document.getElementById('delivery-item-features').innerText = `${item.category} - ${item.color}`;
+            
+            const modal = document.getElementById('modal-entrega');
+            const content = document.getElementById('modal-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
 
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Donaciones_CAP_${new Date().toISOString().split('T')[0]}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        window.closeModal = function() {
+            const modal = document.getElementById('modal-entrega');
+            const content = document.getElementById('modal-content');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        window.confirmDelivery = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('delivery-item-id').value;
+            const student = document.getElementById('student-name').value;
+            const grade = document.getElementById('student-grade').value;
+            const group = document.getElementById('student-group').value;
+
+            try {
+                await updateDoc(doc(db, "objetos", id), {
+                    status: "Entregado",
+                    student, grade, group
+                });
+                closeModal();
+                alert("¡Entrega registrada con éxito!");
+            } catch (err) {
+                console.error(err);
+                alert("Error al registrar entrega: " + err.message);
+            }
         }
     </script>
 </body>
