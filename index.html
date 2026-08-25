@@ -446,7 +446,7 @@
             }
         }
 
-        // GUARDADO REAL EN LA NUBE
+ // GUARDADO DIRECTO EN FIRESTORE (SIN USAR STORAGE / 100% GRATIS)
         window.saveNewItem = async function(e) {
             e.preventDefault();
             const category = document.getElementById('reg-category').value;
@@ -466,10 +466,10 @@
 
             try {
                 let photoUrl = "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=200";
+
+                // Convierte la imagen a texto comprimido directamente
                 if (selectedFileBlob) {
-                    const storageRef = ref(storage, `fotos/${Date.now()}_${selectedFileBlob.name}`);
-                    const uploadResult = await uploadBytes(storageRef, selectedFileBlob);
-                    photoUrl = await getDownloadURL(uploadResult.ref);
+                    photoUrl = await compressAndConvertToBase64(selectedFileBlob);
                 }
 
                 await addDoc(collection(db, "objetos"), {
@@ -481,51 +481,36 @@
                 document.getElementById('photo-placeholder').classList.remove('hidden');
                 selectedFileBlob = null;
                 window.switchTab('inventario');
-                alert(`¡Guardado en la Nube con éxito!\nCódigo asignado: ${formattedCode}`);
+                alert(`¡Guardado con éxito!\nCódigo asignado: ${formattedCode}`);
             } catch (err) {
                 console.error(err);
-                alert("Hubo un percance al subir a la nube. Verifica las reglas de Firestore y Storage.");
+                alert("Hubo un error al guardar: " + err.message);
             }
         }
 
-        window.openDeliveryModal = function(id) {
-            const item = window.itemsGlobal.find(i => i.id === id);
-            if (!item) return;
-            document.getElementById('delivery-item-id').value = id;
-            document.getElementById('delivery-item-code').innerText = item.code;
-            document.getElementById('delivery-item-features').innerText = `${item.category} • ${item.color}`;
-            document.getElementById('delivery-item-img').src = item.photo;
+        // Función auxiliar para optimizar y reducir el tamaño de la foto gratis
+        function compressAndConvertToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const maxWidth = 600; // Redimensiona para no saturar memoria
+                        const scaleSize = maxWidth / img.width;
+                        canvas.width = maxWidth;
+                        canvas.height = img.height * scaleSize;
 
-            document.getElementById('modal-entrega').classList.remove('hidden');
-            setTimeout(() => {
-                document.getElementById('modal-content').classList.remove('scale-95', 'opacity-0');
-                document.getElementById('modal-content').classList.add('scale-100', 'opacity-100');
-            }, 10);
-        }
-
-        window.closeModal = function() {
-            document.getElementById('modal-content').classList.remove('scale-100', 'opacity-100');
-            document.getElementById('modal-content').classList.add('scale-95', 'opacity-0');
-            setTimeout(() => { document.getElementById('modal-entrega').classList.add('hidden'); }, 200);
-        }
-
-        window.confirmDelivery = async function(e) {
-            e.preventDefault();
-            const id = document.getElementById('delivery-item-id').value;
-            const student = document.getElementById('student-name').value;
-            const grade = document.getElementById('student-grade').value;
-            const group = document.getElementById('student-group').value;
-
-            try {
-                const docRef = doc(db, "objetos", id);
-                await updateDoc(docRef, {
-                    status: "Entregado", student, grade: grade || null, group: group || null
-                });
-                window.closeModal();
-            } catch (err) {
-                console.error(err);
-                alert("Error al guardar la entrega en la nube.");
-            }
+                        const ctx = canvas.getContext('2d'); // <-- CORREGIDO AQUÍ ('2d')
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compresión al 70%
+                    };
+                    img.onerror = (error) => reject(error);
+                };
+                reader.onerror = (error) => reject(error);
+            });
         }
 
         function renderDonationTable() {
@@ -561,6 +546,22 @@
                 return;
             }
 
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+            csvContent += "Codigo,Categoria,Color,Marca,Descripcion,Fecha Hallazgo\n";
+
+            itemsBodega.forEach(i => {
+                const cleanDesc = (i.description || '').replace(/"/g, '""');
+                csvContent += `"${i.code}","${i.category}","${i.color}","${i.brand}","${cleanDesc}","${i.date}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Donaciones_CAP_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
             // UTF-8 BOM para soporte correcto de tildes en Excel
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
             csvContent += "Codigo,Categoria,Color,Marca,Descripcion,Fecha Hallazgo\n";
