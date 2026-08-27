@@ -63,7 +63,7 @@
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between">
                 <div class="relative w-full md:w-1/2">
                     <i data-lucide="search" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
-                    <input type="text" id="search-input" oninput="filterItems()" placeholder="Buscar por código (ej: ROP-001), color, marca, descripción..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm">
+                    <input type="text" id="search-input" oninput="filterItems()" placeholder="Buscar por código (ej: ROP-001), color, marca, alumno..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm">
                 </div>
                 
                 <div class="flex flex-wrap gap-2 w-full md:w-auto justify-end">
@@ -82,7 +82,7 @@
                     <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200" id="status-filter-container">
                         <button onclick="setStatusFilter('Todos')" id="filter-status-todos" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-800 shadow-sm transition-all">Todos</button>
                         <button onclick="setStatusFilter('En Bodega')" id="filter-status-bodega" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">En Bodega</button>
-                        <button onclick="setStatusFilter('Entregado')" id="filter-status-entregado" class="hidden px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">Entregados</button>
+                        <button onclick="setStatusFilter('Entregado')" id="filter-status-entregado" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">Entregados</button>
                     </div>
                 </div>
             </div>
@@ -184,6 +184,7 @@
                                 <th class="py-3 px-4">Características (Color / Marca)</th>
                                 <th class="py-3 px-4">Detalles</th>
                                 <th class="py-3 px-4">Fecha Hallazgo</th>
+                                <th class="py-3 px-4">Foto</th>
                             </tr>
                         </thead>
                         <tbody id="donation-table-body" class="text-sm divide-y divide-slate-100 text-slate-700"></tbody>
@@ -367,18 +368,14 @@
             
             const tabReg = document.getElementById('tab-registro');
             const tabRep = document.getElementById('tab-reportes');
-            const filterEntregado = document.getElementById('filter-status-entregado');
 
             if (tabReg) tabReg.style.display = isAdmin ? 'flex' : 'none';
             if (tabRep) tabRep.style.display = isAdmin ? 'flex' : 'none';
-            if (filterEntregado) filterEntregado.style.display = isAdmin ? 'inline-block' : 'none';
             
             if (!isAdmin) {
                 window.switchTab('inventario');
-                if(window.currentStatusFilter === 'Entregado') window.setStatusFilter('Todos');
-            } else {
-                window.filterItems();
             }
+            window.filterItems();
             if (window.lucide) lucide.createIcons();
         }
 
@@ -448,7 +445,7 @@
                 
                 card.innerHTML = `
                     <div class="relative h-44 bg-slate-100 cursor-pointer overflow-hidden group" onclick="openImageModal('${item.photo}', '${item.code}', '${item.category} - ${item.color}: ${item.description}')">
-                        <!-- Etiqueta clara sobre la foto para saber disponibilidad sin ambigüedades -->
+                        <!-- Etiqueta sobre la foto -->
                         <span class="absolute top-2 right-2 z-10 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm backdrop-blur-md ${isBodega ? 'bg-emerald-500/90 text-white' : 'bg-slate-700/80 text-slate-200'}">
                             ${isBodega ? '● En Bodega' : '✓ Entregado'}
                         </span>
@@ -472,7 +469,13 @@
                             <p class="text-xs text-slate-500 italic pl-1 border-l font-normal">"${item.description}"</p>
                         </div>
                         <div class="pt-1 space-y-2">
-                            ${isBodega ? (isAdmin ? `<button onclick="openDeliveryModal('${item.id}')" class="w-full bg-blue-50 hover:bg-amber-500 hover:text-white text-blue-700 py-2 rounded-xl text-xs font-semibold transition-colors">Registrar Entrega</button>` : `<div class="text-center py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold">Disponible en Bodega</div>`) : `<div class="bg-slate-100 p-2 rounded-xl text-[11px]"><span class="font-bold text-slate-700 block">Entregado a:</span>${item.student} ${item.grade ? `(${item.grade} ${item.group || ''})` : ''}</div>`}
+                            ${isBodega ? 
+                                (isAdmin ? 
+                                    `<button onclick="openDeliveryModal('${item.id}')" class="w-full bg-blue-50 hover:bg-amber-500 hover:text-white text-blue-700 py-2 rounded-xl text-xs font-semibold transition-colors">Registrar Entrega</button>` : 
+                                    `<div class="text-center py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold">Disponible en Bodega</div>`
+                                ) : 
+                                `<div class="bg-slate-100 p-2 rounded-xl text-[11px]"><span class="font-bold text-slate-700 block">✓ Entregado a:</span>${item.student || 'Alumno'} ${item.grade ? `(${item.grade} ${item.group || ''})` : ''}</div>`
+                            }
                             
                             ${isAdmin ? `<button onclick="openDeleteModal('${item.id}')" class="w-full text-red-500 hover:bg-red-50 hover:text-red-700 py-1.5 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Eliminar</button>` : ''}
                         </div>
@@ -569,7 +572,7 @@
             const itemsBodega = window.itemsGlobal.filter(i => i.status === 'En Bodega');
             
             if (itemsBodega.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">No hay objetos pendientes para donación en bodega.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400">No hay objetos pendientes para donación en bodega.</td></tr>`;
                 return;
             }
             
@@ -582,9 +585,15 @@
                     <td class="py-3 px-4 text-slate-600">${item.color || ''} ${item.brand ? '/ ' + item.brand : ''}</td>
                     <td class="py-3 px-4 text-slate-500 italic text-xs max-w-xs truncate">${item.description || '-'}</td>
                     <td class="py-3 px-4 text-slate-500 text-xs">${item.date || '-'}</td>
+                    <td class="py-3 px-4">
+                        <a href="${item.photo}" target="_blank" class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                            <i data-lucide="external-link" class="w-3 h-3"></i> Ver Foto
+                        </a>
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
+            if (window.lucide) lucide.createIcons();
         }
 
         window.exportToExcelSim = function() {
@@ -595,11 +604,11 @@
             }
 
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-            csvContent += "Codigo,Categoria,Color,Marca,Descripcion,Fecha Hallazgo\n";
+            csvContent += "Codigo,Categoria,Color,Marca,Descripcion,Fecha Hallazgo,Link Foto\n";
 
             itemsBodega.forEach(i => {
                 const cleanDesc = (i.description || '').replace(/"/g, '""');
-                csvContent += `"${i.code}","${i.category}","${i.color}","${i.brand}","${cleanDesc}","${i.date}"\n`;
+                csvContent += `"${i.code}","${i.category}","${i.color}","${i.brand}","${cleanDesc}","${i.date}","${i.photo}"\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
