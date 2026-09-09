@@ -35,6 +35,9 @@
                 <!-- Sistema de Acceso Discreto por PIN -->
                 <div class="flex items-center gap-2">
                     <span id="badge-rol" class="text-[10px] uppercase font-bold px-2 py-1 bg-blue-900 text-blue-200 rounded-lg border border-blue-700">Modo Consulta</span>
+                    <button onclick="forceUpdate()" class="text-xs font-semibold bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1" title="Recargar la versión más reciente">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span>Actualizar</span>
+                    </button>
                     <button onclick="toggleAdminAccess()" id="btn-acceso" class="text-xs font-semibold bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1">
                         <i data-lucide="lock" class="w-3.5 h-3.5" id="icono-lock"></i> <span id="texto-lock">Ingresar PIN</span>
                     </button>
@@ -165,8 +168,8 @@
 
                     <div class="pt-2 flex justify-end gap-3">
                         <button type="button" onclick="switchTab('inventario')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Cancelar</button>
-                        <button type="submit" class="px-5 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-sm transition-all flex items-center gap-2">
-                            <i data-lucide="check" class="w-4 h-4"></i> Guardar Registro
+                        <button type="submit" id="btn-save" class="px-5 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all flex items-center gap-2">
+                            <i data-lucide="check" class="w-4 h-4"></i> <span id="btn-save-text">Guardar Registro</span>
                         </button>
                     </div>
                 </form>
@@ -303,7 +306,7 @@
     <!-- CONEXIÓN FIREBASE FIRESTORE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, query, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, addDoc, onSnapshot, updateDoc, doc, query, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyALujqBj5cBkmCn6U3xNO7EnQEpllQ7leY",
@@ -315,7 +318,10 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        // Fuerza long-polling para mejorar la estabilidad en iPad/Safari y redes que cortan WebChannel/QUIC.
+        const db = initializeFirestore(app, {
+            experimentalForceLongPolling: true
+        });
 
         const categoryPrefixes = { Ropa: "ROP", Botellas: "BOT", Tupper: "TUP", Calzado: "CAL", Loncheras: "LON", Mochilas: "MOC", Bolsas: "BOL", General: "GEN" };
         const PIN_CORRECTO = "P0803";
@@ -324,7 +330,10 @@
         window.currentStatusFilter = 'Todos';
         window.itemsGlobal = [];
         let selectedFileBlob = null;
+        let photoProcessing = false;
         let itemToDeleteId = null;
+        const APP_VERSION = "2026.09.09.1";
+        const MAX_PHOTO_DATAURL_LENGTH = 700000; // margen seguro bajo el límite de ~1 MiB por documento de Firestore
 
         window.addEventListener('DOMContentLoaded', () => {
             applyRoleUI(); 
@@ -355,6 +364,12 @@
                     input.value = busquedaRapida;
                 }
             }
+        }
+
+        window.forceUpdate = function() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('v', `${APP_VERSION}-${Date.now()}`);
+            window.location.replace(url.toString());
         }
 
         window.toggleAdminAccess = function() {
@@ -523,11 +538,26 @@
 
         window.saveNewItem = async function(e) {
             e.preventDefault();
+
+            if (photoProcessing) {
+                alert("La fotografía todavía se está procesando. Espera un momento y vuelve a guardar.");
+                return;
+            }
+
+            if (!selectedFileBlob) {
+                alert("Selecciona o toma una fotografía antes de guardar.");
+                return;
+            }
+
             const category = document.getElementById('reg-category').value;
             const prefix = categoryPrefixes[category] || "GEN";
-            
-            const categoryItems = window.itemsGlobal.filter(i => i.category === category);
-            const nextNum = categoryItems.length + 1;
+
+            // Toma el número mayor existente para evitar reutilizar códigos después de eliminar registros.
+            const usedNumbers = window.itemsGlobal
+                .filter(i => i.category === category && typeof i.code === 'string' && i.code.startsWith(prefix + '-'))
+                .map(i => parseInt(i.code.split('-').pop(), 10))
+                .filter(n => Number.isFinite(n));
+            const nextNum = (usedNumbers.length ? Math.max(...usedNumbers) : 0) + 1;
             const paddedNum = String(nextNum).padStart(3, '0');
             const newCode = `${prefix}-${paddedNum}`;
 
@@ -535,39 +565,134 @@
                 code: newCode,
                 category: category,
                 date: document.getElementById('reg-date').value,
-                color: document.getElementById('reg-color').value,
-                brand: document.getElementById('reg-brand').value || "Sin Marca",
-                description: document.getElementById('reg-description').value,
-                photo: selectedFileBlob || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&q=80",
+                color: document.getElementById('reg-color').value.trim(),
+                brand: document.getElementById('reg-brand').value.trim() || "Sin Marca",
+                description: document.getElementById('reg-description').value.trim(),
+                photo: selectedFileBlob,
                 status: "En Bodega",
                 createdAt: new Date().toISOString()
             };
+
+            const saveBtn = document.getElementById('btn-save');
+            const saveText = document.getElementById('btn-save-text');
+            saveBtn.disabled = true;
+            saveText.textContent = "Guardando...";
 
             try {
                 await addDoc(collection(db, "objetos"), newItem);
                 alert(`Objeto registrado con éxito. Código: ${newCode}`);
                 document.getElementById('form-registro').reset();
+                document.getElementById('reg-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('photo-preview').src = '';
                 document.getElementById('photo-preview').classList.add('hidden');
                 document.getElementById('photo-placeholder').classList.remove('hidden');
                 selectedFileBlob = null;
                 switchTab('inventario');
             } catch (err) {
-                console.error("Error guardando objeto: ", err);
-                alert("Ocurrió un error al guardar el registro.");
+                console.error("Error guardando objeto:", err);
+                const code = err?.code || "sin-codigo";
+                const message = err?.message || String(err);
+                alert(`No se pudo guardar.\n\nCódigo: ${code}\n\n${message}`);
+            } finally {
+                saveBtn.disabled = false;
+                saveText.textContent = "Guardar Registro";
             }
         }
 
-        window.previewImage = function(e) {
+        async function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                const objectUrl = URL.createObjectURL(file);
+                const img = new Image();
+
+                img.onload = () => {
+                    try {
+                        let width = img.naturalWidth || img.width;
+                        let height = img.naturalHeight || img.height;
+                        const maxDimension = 1280;
+
+                        if (width > maxDimension || height > maxDimension) {
+                            const scale = Math.min(maxDimension / width, maxDimension / height);
+                            width = Math.round(width * scale);
+                            height = Math.round(height * scale);
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d', { alpha: false });
+                        if (!ctx) throw new Error('No se pudo preparar la imagen.');
+
+                        let quality = 0.78;
+                        let dataUrl = '';
+
+                        // Si sigue siendo grande, reduce calidad y después dimensiones de forma gradual.
+                        for (let attempt = 0; attempt < 8; attempt++) {
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(0, 0, width, height);
+                            ctx.drawImage(img, 0, 0, width, height);
+                            dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+                            if (dataUrl.length <= MAX_PHOTO_DATAURL_LENGTH) break;
+
+                            if (quality > 0.50) {
+                                quality -= 0.08;
+                            } else {
+                                width = Math.max(640, Math.round(width * 0.85));
+                                height = Math.max(640, Math.round(height * 0.85));
+                            }
+                        }
+
+                        if (!dataUrl || dataUrl.length > MAX_PHOTO_DATAURL_LENGTH) {
+                            throw new Error('La fotografía sigue siendo demasiado grande. Intenta tomarla con menos zoom o selecciona otra imagen.');
+                        }
+
+                        resolve(dataUrl);
+                    } catch (error) {
+                        reject(error);
+                    } finally {
+                        URL.revokeObjectURL(objectUrl);
+                    }
+                };
+
+                img.onerror = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    reject(new Error('No se pudo leer la fotografía seleccionada.'));
+                };
+
+                img.src = objectUrl;
+            });
+        }
+
+        window.previewImage = async function(e) {
             const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(evt) {
-                    selectedFileBlob = evt.target.result;
-                    document.getElementById('photo-preview').src = selectedFileBlob;
-                    document.getElementById('photo-preview').classList.remove('hidden');
-                    document.getElementById('photo-placeholder').classList.add('hidden');
-                }
-                reader.readAsDataURL(file);
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                alert('Selecciona un archivo de imagen válido.');
+                e.target.value = '';
+                return;
+            }
+
+            const saveBtn = document.getElementById('btn-save');
+            const saveText = document.getElementById('btn-save-text');
+            photoProcessing = true;
+            saveBtn.disabled = true;
+            saveText.textContent = 'Procesando foto...';
+
+            try {
+                selectedFileBlob = await compressImage(file);
+                document.getElementById('photo-preview').src = selectedFileBlob;
+                document.getElementById('photo-preview').classList.remove('hidden');
+                document.getElementById('photo-placeholder').classList.add('hidden');
+            } catch (error) {
+                console.error('Error procesando fotografía:', error);
+                selectedFileBlob = null;
+                e.target.value = '';
+                alert(error.message || 'No se pudo procesar la fotografía.');
+            } finally {
+                photoProcessing = false;
+                saveBtn.disabled = false;
+                saveText.textContent = 'Guardar Registro';
             }
         }
 
