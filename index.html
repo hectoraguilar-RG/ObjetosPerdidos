@@ -93,6 +93,13 @@
                         <option value="General">General</option>
                     </select>
 
+                    <select id="filter-name" onchange="filterItems()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Todos">Todos los nombres</option>
+                        <option value="Con nombre">Con nombre</option>
+                        <option value="Sin nombre">Sin nombre</option>
+                        <option value="Por revisar">Por revisar (registros anteriores)</option>
+                    </select>
+
                     <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200" id="status-filter-container">
                         <button onclick="setStatusFilter('Todos')" id="filter-status-todos" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-800 shadow-sm transition-all">Todos</button>
                         <button onclick="setStatusFilter('En Bodega')" id="filter-status-bodega" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">En Bodega</button>
@@ -147,6 +154,21 @@
                         </div>
                     </div>
 
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">¿El objeto tiene nombre? *</label>
+                            <select id="reg-has-name" required onchange="toggleNameField()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <option value="" disabled selected>Selecciona una opción</option>
+                                <option value="true">Sí</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
+                        <div id="reg-name-wrap" class="hidden">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Nombre identificado *</label>
+                            <input type="text" id="reg-owner-name" placeholder="Ej: Santiago Urreta Porras" class="w-full bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Descripción Específica / Detalles distintivos *</label>
                         <textarea id="reg-description" rows="2" required placeholder="Ej: Raspado de la base, tiene grabado el nombre de un niño borroso." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
@@ -183,9 +205,20 @@
                     <h2 class="text-lg font-bold text-slate-900">Listado para Donación</h2>
                     <p class="text-xs text-slate-500">Objetos almacenados en bodega que no fueron reclamados durante el ciclo escolar.</p>
                 </div>
-                <button onclick="exportToExcelSim()" class="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2 w-full sm:w-auto justify-center">
-                    <i data-lucide="download" class="w-4 h-4"></i> Exportar Lista (.CSV)
-                </button>
+                <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <button onclick="exportToExcelSim('all')" class="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2 justify-center">
+                        <i data-lucide="download" class="w-4 h-4"></i> Exportar CSV
+                    </button>
+                    <button onclick="exportToExcelSim('named')" class="bg-amber-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-amber-600 transition-all shadow-sm flex items-center gap-2 justify-center">
+                        <i data-lucide="tag" class="w-4 h-4"></i> Solo con nombre
+                    </button>
+                    <button onclick="exportPhotoCatalog()" class="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2 justify-center">
+                        <i data-lucide="images" class="w-4 h-4"></i> Catálogo con fotos
+                    </button>
+                    <button onclick="closeCycleAndDeleteAll()" class="bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-red-700 transition-all shadow-sm flex items-center gap-2 justify-center">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Cerrar ciclo y borrar TODO
+                    </button>
+                </div>
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -303,10 +336,27 @@
         </div>
     </div>
 
+    <!-- MODAL DE EDICIÓN -->
+    <div id="modal-editar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-lg overflow-hidden">
+            <div class="bg-blue-50 px-6 py-4 border-b border-blue-100 flex justify-between items-center">
+                <h3 class="font-semibold text-blue-900">Editar objeto</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <form onsubmit="saveEdit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="edit-item-id">
+                <div><label class="block text-xs font-medium mb-1">¿Tiene nombre?</label><select id="edit-has-name" onchange="toggleEditNameField()" class="w-full border rounded-xl px-3 py-2"><option value="true">Sí</option><option value="false">No</option></select></div>
+                <div id="edit-name-wrap"><label class="block text-xs font-medium mb-1">Nombre identificado</label><input id="edit-owner-name" type="text" class="w-full border rounded-xl px-3 py-2"></div>
+                <div><label class="block text-xs font-medium mb-1">Descripción</label><textarea id="edit-description" rows="3" class="w-full border rounded-xl px-3 py-2"></textarea></div>
+                <div class="flex justify-end gap-2"><button type="button" onclick="closeEditModal()" class="px-4 py-2 text-sm">Cancelar</button><button type="submit" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-xl">Guardar cambios</button></div>
+            </form>
+        </div>
+    </div>
+
     <!-- CONEXIÓN FIREBASE FIRESTORE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { initializeFirestore, collection, addDoc, onSnapshot, updateDoc, doc, query, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, addDoc, onSnapshot, updateDoc, doc, query, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyALujqBj5cBkmCn6U3xNO7EnQEpllQ7leY",
@@ -328,11 +378,12 @@
         
         window.currentRole = 'consulta';
         window.currentStatusFilter = 'Todos';
+        window.currentNameFilter = 'Todos';
         window.itemsGlobal = [];
         let selectedFileBlob = null;
         let photoProcessing = false;
         let itemToDeleteId = null;
-        const APP_VERSION = "2026.09.09.1";
+        const APP_VERSION = "2026.10.06.2";
         const MAX_PHOTO_DATAURL_LENGTH = 700000; // margen seguro bajo el límite de ~1 MiB por documento de Firestore
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -437,24 +488,43 @@
             window.filterItems();
         }
 
+        window.toggleNameField = function() {
+            const hasName = document.getElementById('reg-has-name').value === 'true';
+            const wrap = document.getElementById('reg-name-wrap');
+            const input = document.getElementById('reg-owner-name');
+            wrap.classList.toggle('hidden', !hasName);
+            input.required = hasName;
+            if (!hasName) input.value = '';
+        }
+
+        function getNameState(item) {
+            if (item.hasName === true) return 'Con nombre';
+            if (item.hasName === false) return 'Sin nombre';
+            return 'Por revisar';
+        }
+
         window.filterItems = function() {
             const searchInput = document.getElementById('search-input');
             const categoryInput = document.getElementById('filter-category');
             const sortInput = document.getElementById('sort-order');
+            const nameInput = document.getElementById('filter-name');
             
             const searchText = searchInput ? searchInput.value.toLowerCase() : '';
             const categoryText = categoryInput ? categoryInput.value : 'Todos';
             const sortType = sortInput ? sortInput.value : 'code-asc';
+            const nameFilter = nameInput ? nameInput.value : 'Todos';
 
             let filtered = window.itemsGlobal.filter(item => {
                 const matchesSearch = (item.code || '').toLowerCase().includes(searchText) || 
                                     (item.color || '').toLowerCase().includes(searchText) || 
                                     (item.brand || '').toLowerCase().includes(searchText) || 
                                     (item.description || '').toLowerCase().includes(searchText) ||
-                                    (item.student && item.student.toLowerCase().includes(searchText));
+                                    (item.student && item.student.toLowerCase().includes(searchText)) ||
+                                    (item.ownerName && item.ownerName.toLowerCase().includes(searchText));
                 const matchesCategory = categoryText === 'Todos' || item.category === categoryText;
                 const matchesStatus = window.currentStatusFilter === 'Todos' || item.status === window.currentStatusFilter;
-                return matchesSearch && matchesCategory && matchesStatus;
+                const matchesName = nameFilter === 'Todos' || getNameState(item) === nameFilter;
+                return matchesSearch && matchesCategory && matchesStatus && matchesName;
             });
 
             // Ordenamiento Natural / Inteligente
@@ -512,6 +582,7 @@
                                 <div><span class="text-slate-400">Color:</span> <span class="font-semibold text-slate-700">${item.color || 'No especificado'}</span></div>
                                 <div><span class="text-slate-400">Marca:</span> <span class="font-semibold text-slate-700">${item.brand || 'N/A'}</span></div>
                                 <div><span class="text-slate-400">Hallazgo:</span> <span class="font-semibold text-slate-700">${item.date || 'Sin fecha'}</span></div>
+                                ${item.hasName === true ? `<div class="mt-1 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 text-amber-800"><b>🏷️ Nombre:</b> ${item.ownerName || 'Sí, sin capturar'}</div>` : item.hasName === undefined ? `<div class="mt-1 text-[10px] text-slate-400">Nombre: por revisar</div>` : ''}
                             </div>
                             <p class="text-xs text-slate-500 italic pl-1 border-l-2 border-slate-200 font-normal line-clamp-2">"${item.description || ''}"</p>
                         </div>
@@ -527,7 +598,7 @@
                                     ${item.grade ? `<p class="text-[10px] text-slate-500">${item.grade} ${item.group ? 'Grupo ' + item.group : ''}</p>` : ''}
                                 </div>`
                             }
-                            ${isAdmin ? `<button onclick="openDeleteModal('${item.id}')" class="w-full text-red-500 hover:text-red-700 hover:bg-red-50 py-1 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"><i data-lucide="trash-2" class="w-3 h-3"></i> Eliminar</button>` : ''}
+                            ${isAdmin ? `<button onclick="openEditModal('${item.id}')" class="w-full text-blue-600 hover:text-blue-800 hover:bg-blue-50 py-1 rounded-lg text-xs transition-colors">Editar / Nombre</button><button onclick="openDeleteModal('${item.id}')" class="w-full text-red-500 hover:text-red-700 hover:bg-red-50 py-1 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"><i data-lucide="trash-2" class="w-3 h-3"></i> Eliminar</button>` : ''}
                         </div>
                     </div>
                 `;
@@ -568,6 +639,8 @@
                 color: document.getElementById('reg-color').value.trim(),
                 brand: document.getElementById('reg-brand').value.trim() || "Sin Marca",
                 description: document.getElementById('reg-description').value.trim(),
+                hasName: document.getElementById('reg-has-name').value === 'true',
+                ownerName: document.getElementById('reg-has-name').value === 'true' ? document.getElementById('reg-owner-name').value.trim() : '',
                 photo: selectedFileBlob,
                 status: "En Bodega",
                 createdAt: new Date().toISOString()
@@ -587,6 +660,8 @@
                 document.getElementById('photo-preview').classList.add('hidden');
                 document.getElementById('photo-placeholder').classList.remove('hidden');
                 selectedFileBlob = null;
+                document.getElementById('reg-name-wrap').classList.add('hidden');
+                document.getElementById('reg-owner-name').required = false;
                 switchTab('inventario');
             } catch (err) {
                 console.error("Error guardando objeto:", err);
@@ -694,6 +769,33 @@
                 saveBtn.disabled = false;
                 saveText.textContent = 'Guardar Registro';
             }
+        }
+
+        window.openEditModal = function(id) {
+            const item = window.itemsGlobal.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('edit-item-id').value = id;
+            document.getElementById('edit-has-name').value = item.hasName === true ? 'true' : 'false';
+            document.getElementById('edit-owner-name').value = item.ownerName || '';
+            document.getElementById('edit-description').value = item.description || '';
+            toggleEditNameField();
+            document.getElementById('modal-editar').classList.remove('hidden');
+        }
+        window.closeEditModal = function() { document.getElementById('modal-editar').classList.add('hidden'); }
+        window.toggleEditNameField = function() {
+            const yes = document.getElementById('edit-has-name').value === 'true';
+            document.getElementById('edit-name-wrap').classList.toggle('hidden', !yes);
+        }
+        window.saveEdit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-item-id').value;
+            const hasName = document.getElementById('edit-has-name').value === 'true';
+            const ownerName = document.getElementById('edit-owner-name').value.trim();
+            if (hasName && !ownerName) { alert('Captura el nombre identificado.'); return; }
+            try {
+                await updateDoc(doc(db, 'objetos', id), { hasName, ownerName: hasName ? ownerName : '', description: document.getElementById('edit-description').value.trim(), updatedAt: new Date().toISOString() });
+                closeEditModal();
+            } catch(err) { alert('No se pudo editar: ' + (err.message || err)); }
         }
 
         window.openDeliveryModal = function(id) {
@@ -809,19 +911,56 @@
             });
         }
 
-        window.exportToExcelSim = function() {
-            const inBodega = window.itemsGlobal.filter(i => i.status === 'En Bodega');
-            let csvContent = "data:text/csv;charset=utf-8,Codigo,Categoria,Color,Marca,Descripcion,FechaHallazgo\n";
-            inBodega.forEach(i => {
-                csvContent += `"${i.code}","${i.category}","${i.color}","${i.brand}","${i.description}","${i.date}"\n`;
-            });
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "donaciones_cap_secundaria.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        function csvSafe(value) {
+            return '"' + String(value ?? '').replace(/"/g, '""') + '"';
+        }
+
+        window.exportToExcelSim = function(mode = 'all') {
+            let rows = window.itemsGlobal.filter(i => i.status === 'En Bodega');
+            if (mode === 'named') rows = rows.filter(i => i.hasName === true);
+            const header = ['Codigo','Categoria','Color','Marca','TieneNombre','NombreIdentificado','Descripcion','FechaHallazgo','Estatus'];
+            const lines = [header.map(csvSafe).join(',')];
+            rows.forEach(i => lines.push([
+                i.code, i.category, i.color, i.brand, i.hasName === true ? 'Si' : i.hasName === false ? 'No' : 'Por revisar',
+                i.ownerName || '', i.description || '', i.date || '', i.status || ''
+            ].map(csvSafe).join(',')));
+            // BOM UTF-8 para acentos en Excel. Código y fecha se exportan como texto limpio.
+            const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = mode === 'named' ? 'objetos_con_nombre.csv' : 'donaciones_cap_secundaria.csv';
+            document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+        }
+
+        window.exportPhotoCatalog = function() {
+            const rows = window.itemsGlobal.filter(i => i.status === 'En Bodega');
+            const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            const cards = rows.map(i => `<div class="card"><img src="${i.photo || ''}"><div><b>${esc(i.code)}</b> · ${esc(i.category)}<br>${esc(i.color)} / ${esc(i.brand)}<br>${i.hasName === true ? '<b>Nombre: '+esc(i.ownerName || '')+'</b><br>' : ''}${esc(i.description)}<br><small>Hallazgo: ${esc(i.date)}</small></div></div>`).join('');
+            const html = `<!doctype html><html><head><meta charset="utf-8"><title>Catálogo de donación</title><style>body{font-family:Arial,sans-serif;margin:24px}h1{font-size:20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{border:1px solid #ddd;border-radius:10px;padding:10px;font-size:12px;break-inside:avoid}.card img{width:100%;height:180px;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-bottom:8px}@media print{.grid{grid-template-columns:repeat(3,1fr)}}</style></head><body><h1>CAP Secundaria · Objetos en bodega</h1><p>Total: ${rows.length} · Generado: ${new Date().toLocaleString('es-MX')}</p><div class="grid">${cards}</div></body></html>`;
+            const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+            const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='catalogo_objetos_con_fotos.html'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+        }
+
+        window.closeCycleAndDeleteAll = async function() {
+            if (window.currentRole !== 'admin') return;
+            if (!window.itemsGlobal.length) { alert('No hay registros para borrar.'); return; }
+            const first = confirm(`Se eliminarán PERMANENTEMENTE ${window.itemsGlobal.length} registros, incluidas sus fotografías.\n\nAntes de continuar, asegúrate de haber exportado el resumen/catálogo de donación.\n\n¿Deseas continuar?`);
+            if (!first) return;
+            const phrase = prompt('Para confirmar el cierre del ciclo escribe exactamente: BORRAR TODO');
+            if (phrase !== 'BORRAR TODO') { alert('Operación cancelada.'); return; }
+            try {
+                const ids = window.itemsGlobal.map(i => i.id);
+                for (let start = 0; start < ids.length; start += 450) {
+                    const batch = writeBatch(db);
+                    ids.slice(start, start + 450).forEach(id => batch.delete(doc(db, 'objetos', id)));
+                    await batch.commit();
+                }
+                alert('Ciclo cerrado. Todos los registros fueron eliminados de Firestore.');
+            } catch(err) {
+                console.error(err);
+                alert('No se pudo completar el borrado: ' + (err.message || err));
+            }
         }
     </script>
 </body>
